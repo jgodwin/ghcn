@@ -1,0 +1,60 @@
+<!DOCTYPE HTML>
+<html>
+
+  <head>
+    <meta name="viewport" content="initial-scale=1.0">
+    <style>
+      html, body {
+        height:100%;
+        margin: 0;
+        padding:0;
+      }
+      #map {
+        height:100%;
+          background-color: #CCC;
+          }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  </head>
+  <body>
+    <title id="test">TEST</title>
+    <div id="map"></div>
+     <script>
+        function initialize(){
+            var mapCanvas = document.getElementById('map');
+            var mapOptions = {
+                center: new google.maps.LatLng(44.5403,-78.5463),
+                zoom: 5,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            }
+            var map = new google.maps.Map(mapCanvas,mapOptions)
+
+            var url="http://localhost:8080/stations";
+            var data = {'states' : 'CO'};
+            //var data = {};
+
+            $.getJSON(url,data,
+              function(data){
+                console.log('received: '+data.stations.length);
+                data.stations.forEach(function(station){
+                    var marker = new google.maps.Marker({
+                        position:{
+                            lat:station.latitude,
+                            lng:station.longitude},
+                        map:map,
+                        title:station.id
+                    });
+                    marker.addListener('click', function() {
+                        var infowindow = new google.maps.InfoWindow({
+                            content: 'Station ID: '+station.id + 
+                                     '-- Station Name: '+station.name
+                        });
+                        infowindow.open(map, marker);
+                    });
+                });
+              });
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA42xJeCH1tapNwzg3elUgMgc9yVVLFgM0&callback=initialize"></script>
+ </body>
+</html>
