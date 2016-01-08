@@ -1,6 +1,6 @@
 import psycopg2, sys, traceback, StringIO, glob,tarfile
 
-mainDir = '/home/jeff/Dev/ghcn_data'
+mainDir = '/home/jeff/Dev/ghcn/data'
 def path(fileName):
     return mainDir+'/'+fileName
 
@@ -8,7 +8,7 @@ countries = path('ghcnd-countries.txt')
 states = path('ghcnd-states.txt')
 inventory=path('ghcnd-inventory.txt')
 stations=path('ghcnd-stations.txt')
-observationDir = '/home/jeff/Dev/ghcn_data/ghcnd_all'
+observationDir = '/home/jeff/Dev/ghcn/data'
 log = True
 
 def text(nIndent, message):
@@ -139,8 +139,7 @@ def loadObservation(name,fileLike,cursor):
 
 def loadObservations(cursor):
     gzFile = '/ghcnd_all.tar.gz'
-    path = '/home/jeff/Dev/ghcn_data'
-    outputPath=path+'/ghcnd_all'
+    path = '/home/jeff/Dev/ghcn/data'
     tar = tarfile.open(path+gzFile,'r')
     i = 0
     for tarinfo in tar:
@@ -150,8 +149,10 @@ def loadObservations(cursor):
           print 'loading: %s ---- %d' %(name,i)
           loadObservation(name,f,cursor)
           i+=1
+          if i > 1000:
+            break
     tar.close()
-        
+
 def buildTables(cursor):
     buildStationTable(cursor)
     buildStateTable(cursor)
@@ -173,14 +174,18 @@ def main():
 
   cursor = conn.cursor()
   try:
-      clearTables(cursor)
-      buildTables(cursor)
-      loadData(cursor)
+      buildInventoryTable(cursor)
+      loadInventory(cursor)
+      #buildObservationTable(cursor)
+      #loadObservations(cursor)
+      #clearTables(cursor)
+      #buildTables(cursor)
+      #loadData(cursor)
       # Need to add manual commands to create PostGIS database:
       # CREATE EXTENSION postgis;
       # ALTER TABLE Station ADD COLUMN location geography(Point,4326);
       # Update Station SET location = ST_SetSRID(ST_MakePoint(long,lat),4326);
-
+      # DELETE FROM Observation where sid in (select sid from station where lat <0 or long > 0);
       conn.commit()
   except Exception, e:
       traceback.print_exc()
