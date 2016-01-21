@@ -1,4 +1,4 @@
-import psycopg2, sys, traceback, StringIO, glob,tarfile
+import psycopg2, sys, traceback, StringIO, glob,tarfile, os
 
 mainDir = '/home/jeff/Dev/ghcn/data'
 def path(fileName):
