@@ -41,5 +41,23 @@ public class Element {
 			return name;
 		}
 		
+		public String toString(){
+			return getName();
+		}
+		
+		@Override
+		public int hashCode() {
+			return name.hashCode();
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (obj == null) return false;
+			else if (obj.getClass().getName().equals(getClass().getName())){
+				return ((Delegate)obj).name.equals(name);
+			}
+			return false;
+		}
+		
 	}
 }
