@@ -1,5 +1,5 @@
 from ftplib import FTP
-import sys
+import sys, dbutil, os
 
 FTP_URL='ftp.ncdc.noaa.gov'
 FTP_DIR='/pub/data/ghcn/daily/'
@@ -18,10 +18,13 @@ ftp = FTP(FTP_URL)
 ftp.login()
 ftp.cwd(FTP_DIR)
 
+# Make the directory if it does not exist
+os.mkdir(dbutil.dataPath())
+
 for file in files:
     try:
         print 'Retrieving... '+file
-        fout = open(file,'w')
+        fout = open(dbutil.dataPath(file),'w')
 # switch to binary mode
         ftp.sendcmd("TYPE i")
         size = ftp.size(file)
@@ -34,6 +37,7 @@ for file in files:
             sum += len(data)
             sys.stderr.write('\rREAD: '+str(float(sum)/size*100))
         ftp.retrbinary('RETR '+file,wstatus)
+        fout.flush()
         fout.close()
         sys.stderr.write('\r')
     except KeyboardInterrupt:
