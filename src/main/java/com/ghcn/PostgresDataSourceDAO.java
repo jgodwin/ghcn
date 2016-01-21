@@ -40,6 +40,13 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	private static final String STATION_NAME = "name";
 	private static final String STATION_STATE="state";
 	
+	private static final String OBSERVATION_VALUE_PREFIX="value";
+	private static final String OBSERVATION_MONTH="month";
+	private static final String OBSERVATION_YEAR="year";
+	private static final String OBSERVATION_ELEMENT="element";
+	private static final int OBSERVATION_NUM_COLS=31;
+	private static final float OBSERVATION_NULL_VALUE=-9999f;
+	
 	private static final String STATION_TABLE="Station";
 	private static final String INVENTORY_TABLE="Inventory";
 	private static final String OBS_TABLE="Observation";
@@ -51,7 +58,7 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	}
 	
 	private static String buildInQuery(String col, Set<?> inObjects, boolean wantSemiColon){
-		String qry = sub("WHERE %s IN (",col);
+		String qry = sub(" %s IN (",col);
 		int n = inObjects.size();
 		for(int i =0; i < n; ++i){
 			if (i >0) qry+=",";
@@ -69,16 +76,22 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	}
 	
 	@Override
-	public Set<Observation> getObservations(
+	public List<Observation> getObservations(
 			Set<Station.Delegate> stations, 
 			Set<Element.Delegate> elements) {
-		String qry = sub("SELECT sid, ")
+		String qry = sub("SELECT * FROM %s WHERE ", OBS_TABLE);
+		qry+=buildInQuery(STATION_ID, stations, false);
+		qry+=" AND "+buildInQuery(INVENTORY_ELEMENT, elements, true);
+		List<String> objs = new ArrayList<>();
+		stations.forEach((station) -> objs.add(station.getId()));
+		elements.forEach((element)-> objs.add(element.getName()));
+		return jdbc.query(qry, new ObservationElementMapper(), objs.toArray());
 	}
 	
 @Override
-	public Set<Inventory> getInventory(Set<Station.Delegate> stations) {
+	public List<Inventory> getInventory(Set<Station.Delegate> stations) {
 		String qry = 
-				sub("SELECT %s,%s,%s,%s from %s ",
+				sub("SELECT %s,%s,%s,%s from %s WHERE",
 						STATION_ID,INVENTORY_ELEMENT, INVENTORY_FY, INVENTORY_LY, INVENTORY_TABLE) +
 				buildInQuery(STATION_ID, stations, true);
 		Set<String> sids = new HashSet<>();
@@ -92,7 +105,7 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 			elems.add(element);
 			stationMap.put(sid, elems);
 		});
-		Set<Inventory> inventories = new HashSet<>();
+		List<Inventory> inventories = new ArrayList<>();
 		stationMap.forEach((sid, elements) -> {
 			inventories.add(new Inventory(new Station.Delegate(sid),elements));
 		});
@@ -102,18 +115,44 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	@Override
 	public List<Station> getStations() {
 		return jdbc.query(
-				sub("SELECT * FROM %s;",STATION_TABLE), new StationMapper());
+				sub("SELECT * FROM %s WHERE %s in (select distinct %s from %s);",
+						STATION_TABLE,STATION_ID,STATION_ID,INVENTORY_TABLE), new StationMapper());
 	}
 	@Override
 	public List<Station> getStations(Set<String> states) {
 		//Ugly because Postgres does not support mapping Sets or Lists to single ? fields,
 		// as apparently MySql and others do =(
 		String query = sub(
-				"SELECT %s, %s, %s, %s FROM %s ", 
+				"SELECT %s, %s, %s, %s FROM %s WHERE ", 
 					STATION_ID, STATION_NAME, STATION_LATITUDE, STATION_LONGITUDE, STATION_TABLE);
-		query+=buildInQuery(STATION_STATE, states, true);
+		query+=buildInQuery(STATION_STATE, states, false);
+		query+=sub(" AND %s in (select distinct %s from %s);",STATION_ID,STATION_ID,INVENTORY_TABLE);
 		return jdbc.query(query,
 				new StationMapper(),states.toArray() );
+	}
+	
+	private static class ObservationElementMapper implements RowMapper<Observation> {
+		@Override
+		public Observation mapRow(ResultSet rs, int arg1) throws SQLException {
+			float[] values = new float[OBSERVATION_NUM_COLS];
+			for(int i =1 ; i <= OBSERVATION_NUM_COLS; ++i){
+				String raw = rs.getString(OBSERVATION_VALUE_PREFIX+i);
+				float val = -9999;
+				if (raw != null){
+					val = Float.parseFloat(raw);
+				}
+				values[i-1] = val;
+			}
+			int month = rs.getInt(OBSERVATION_MONTH);
+			int year = rs.getInt(OBSERVATION_YEAR);
+			String element = rs.getString(OBSERVATION_ELEMENT);
+			String sid = rs.getString(STATION_ID);
+			return new Observation(
+					new Station.Delegate(sid),
+					new Element.Delegate(element),
+					year, month,
+					values);
+		}
 	}
 	
 	
