@@ -22,11 +22,25 @@ public class GHCNRestController {
 		this.dao = dao;
 	}
 	
+	private static <T> Set<T> toSet(T[] array){
+		return new HashSet<T>(Arrays.asList(array));
+	}
+	
+	@CrossOrigin
+	@RequestMapping(value="/observation", method=RequestMethod.GET)
+	public List<Observation> fetchObservations(
+			@RequestParam(name="stations",required=true) Station.Delegate[] stations,
+			@RequestParam(name="elements",required=true) Element.Delegate[] elements){
+		
+		return dao.getObservations(
+				toSet(stations), toSet(elements));
+	}
+	
 	@CrossOrigin
 	@RequestMapping(value="/inventory", method=RequestMethod.GET)
-	public Set<Inventory> fetchInventories(@RequestParam(name="stations",required=true) 
+	public List<Inventory> fetchInventories(@RequestParam(name="stations",required=true) 
 		Station.Delegate[] delegates){
-		return dao.getInventory(new HashSet<>(Arrays.asList(delegates)));
+		return dao.getInventory(toSet(delegates));
 	}
 	
     @CrossOrigin
@@ -50,7 +64,7 @@ public class GHCNRestController {
     		return new Stations(dao.getStations());
     	} else {
     		return new Stations(dao.getStations(
-    				new HashSet<>(Arrays.asList(states))));
+    				toSet(states)));
     	}
 	}
 //    Does not work...?

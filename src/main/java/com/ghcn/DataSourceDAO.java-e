@@ -22,7 +22,7 @@ public interface DataSourceDAO {
 	 * @param elements
 	 * @return
 	 */
-	public Set<Observation> getObservations(
+	public List<Observation> getObservations(
 			Set<Station.Delegate> stations, Set<Element.Delegate> elements);
 	
 	/**
@@ -30,7 +30,7 @@ public interface DataSourceDAO {
 	 * @param stations
 	 * @return
 	 */
-	public Set<Inventory> getInventory(Set<Station.Delegate> stations);
+	public List<Inventory> getInventory(Set<Station.Delegate> stations);
 
 	/**
 	 * Return the stations for each state.

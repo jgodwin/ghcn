@@ -10,14 +10,27 @@ public class Observation {
 	private Station.Delegate station;
 	private Element.Delegate element;
 	private Unit unit;
+	private int month;
+	private int year;
 	
-	public Observation(Station.Delegate station, Element.Delegate element, float[] data, Unit unit){
+//	public Observation(Station.Delegate station, Element.Delegate element, 
+//			int year, int month, float[] data, Unit unit){
+	public Observation(Station.Delegate station, Element.Delegate element, 
+			int year, int month, float[] data){
 		this.station = station;
 		this.element = element;
 		this.data = data;
 		this.unit = unit;
+		this.month = month;
+		this.year = year;
 	}
 	
+	public int getMonth() {
+		return month;
+	}
+	public int getYear() {
+		return year;
+	}
 	public float[] getData() {
 		return data;
 	}
