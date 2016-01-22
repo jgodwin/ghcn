@@ -9,13 +9,25 @@
         margin: 0;
         padding:0;
       }
+      #mapAndBar {
+        height:100%;
+        width:100%;
+      }
+      #map, #sideBar {display: inline-block; *display: inline; vertical-align: top} 
       #map {
         height:100%;
         width:75%;
-          background-color: #CCC;
-          }
+        background-color: #CCC;
+      }
+      #sideBar {
+        height:100%;
+        width:25%;
+        position: absolute;
+      }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
   </head>
   <body>
     <title id="test">TEST</title>
@@ -24,8 +36,69 @@
             <option value="CO">CO</select>
         </select>
     </div>
+    <div id="mapAndBar">
     <div id="map"></div>
+    <div id="sideBar"> TEXT GOES HERE</div>
      <script>
+        function drawPlot(observations){
+            var series = [];
+            observations.forEach(function(observation){
+                var values = observation.data;
+                var name = observation.element.name;
+                var month = observation.month;
+                var year = observation.year;
+                var data = [];
+                var day;
+                for(day = 0; day < values.length; day++){
+                    data.push([Date.UTC(year, month, day+1), values[day]]);
+                }
+                series.push({name: name, data: data});
+            });
+            var sideBar = document.getElementById("sideBar");
+            $('#sideBar').highcharts({
+                    chart: {
+                           type: 'spline'
+                           },
+                    title: {
+                           text: 'Snow depth at Vikjafjellet, Norway'
+                    },
+                    subtitle: {
+                        text: 'Irregular time data in Highcharts JS'
+                    },
+                    xAxis: {
+                        type: 'datetime',
+                        dateTimeLabelFormats: { // don't display the dummy year
+                        month: '%e. %b',
+                        year: '%b'
+                    },
+                    title: {
+                    text: 'Date'
+                    }
+                    },
+                    yAxis: {
+                    title: {
+                    text: 'Snow depth (m)'
+                    },
+                    min: 0
+                    },
+                    tooltip: {
+                    headerFormat: '<b>{series.name}</b><br>',
+                    pointFormat: '{point.x:%e. %b}: {point.y:.2f} m'
+                    },
+                    plotOptions: {
+                    spline: {
+                    marker: {
+                    enabled: true
+                    }
+                    }
+                    },
+                    series: series
+                    // Define the data points. All series have a dummy year
+                    // of 1970/71 in order to be compared on the same x axis. Not
+    // that in JavaScript, months start at 0 for January, 1 for February etc.
+   });
+        };
+
         function initialize(){
             var mapCanvas = document.getElementById('map');
             var mapOptions = {
@@ -36,6 +109,8 @@
             var map = new google.maps.Map(mapCanvas,mapOptions)
 
             var url="http://localhost:8080/stations";
+            var urlInventory="http://localhost:8080/inventory";
+            var urlObservation="http://localhost:8080/observation";
             var data = {'states' : 'CO'};
             //var data = {};
 
@@ -51,16 +126,57 @@
                         title:station.id
                     });
                     marker.addListener('click', function() {
-                        var infowindow = new google.maps.InfoWindow({
-                            content: 'Station ID: '+station.id + 
-                                     '-- Station Name: '+station.name
+                        $.getJSON(urlInventory,
+                            {'stations':station.id},function(data){
+                          var text = 
+//                            '<p>'+
+                            '<h3>Station Name: '+station.name+'</h3>'+
+                            'Station ID: '+station.id +
+                            '<br>'+
+                            'Available Data: ';
+//                            '</p>';
+                          data.forEach(function(inventory){
+                            inventory.elements.forEach(function(element){
+                            var butText = 
+                                element.name+
+                                '('+element.range.startYear+"-"+
+                                element.range.endYear+')';
+                            text+=
+                                '<br>'+
+                                "<button class='showObs' type='button' width=100% name="+element.name+">"+
+                                    butText+" </button>";
+                            });
+                          });
+
+                          var infowindow = new google.maps.InfoWindow({
+                              content: text
+                          });
+                          infowindow.addListener('domready', function(){
+                            var buttonList = document.getElementsByClassName('showObs');
+                            var i;
+                            for(i =0; i < buttonList.length; i++){
+                                var button = buttonList[i];
+                                console.log(button.name);
+                                button.onclick = function(button) {
+                                    return function(){
+                                  $.getJSON(urlObservation,
+                                      {'stations':station.id, 
+                                      'elements':button.name},
+                                        function(observations){
+                                            drawPlot(observations);
+                                        });
+                                    };
+                                }(button);
+                            };
+                          });
+                          infowindow.open(map, marker);
                         });
-                        infowindow.open(map, marker);
                     });
                 });
               });
         }
     </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA42xJeCH1tapNwzg3elUgMgc9yVVLFgM0&callback=initialize"></script>
+    </div>
  </body>
 </html>
