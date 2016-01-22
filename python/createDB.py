@@ -1,13 +1,9 @@
 import psycopg2, sys, traceback, StringIO, glob,tarfile, os
 from dbutil import *
 
-mainDir = '/home/jeff/Dev/ghcn/data'
-countries = path('ghcnd-countries.txt')
-states = path('ghcnd-states.txt')
-inventory=path('ghcnd-inventory.txt')
-stations=path('ghcnd-stations.txt')
-observationDir = '/home/jeff/Dev/ghcn/data'
-log = True
+'''
+Automatically build the database and tables for the GHCN dataset
+'''
 
 def buildStationTable(cursor):
     execute(cursor,
@@ -21,14 +17,17 @@ def buildStationTable(cursor):
         GSN_FLAG CHAR(3), 
         HCN_CRN_FLAG CHAR(3),
         WMO_ID CHAR(5))''')
+
 def buildStateTable(cursor):
     execute(cursor,'''CREATE TABLE State(
         CODE CHAR(2) PRIMARY KEY,
         NAME TEXT NOT NULL)''')
+
 def buildCountryTable(cursor):
     execute(cursor,'''CREATE TABLE Country(
         CODE CHAR(2) PRIMARY KEY,
         NAME TEXT NOT NULL)''')
+
 def buildInventoryTable(cursor):
     execute(cursor,'''CREATE TABLE Inventory(
         SID CHAR(11) NOT NULL references Station(SID) ON DELETE CASCADE,
@@ -37,6 +36,8 @@ def buildInventoryTable(cursor):
         ELEMENT CHAR(4) NOT NULL,
         FIRSTYEAR INT,
         LASTYEAR INT)''')
+
+# Add the column headers for each day of the month, there are 31 days max
 def dailyColumnHeaders():
     text = ' '.join(['''
         VALUE%i INT, 
@@ -61,11 +62,6 @@ def buildObservationTable(cursor):
 def addPostGIS(cursor):
     execute(cursor,'''CREATE EXTENSION postgis;''')
 
-def addGeomColumn(cursor):
-    # 4326 represents WGS84
-    execute(cursor,
-            '''ALTER TABLE Station ADD COLUMN location geography(Point,4326);''')
-
 def buildTables(cursor):
     buildStationTable(cursor)
     buildStateTable(cursor)
@@ -78,6 +74,12 @@ def main():
   try:
       buildTables(cursor)
       conn.commit()
+      try:
+        addPostGIS(cursor)
+        conn.commit()
+      except Exception, e:
+        # Postgis might already be installed, if so skip
+        print e
   except Exception, e:
       traceback.print_exc()
       print 'error', e

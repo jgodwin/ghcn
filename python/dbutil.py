@@ -1,8 +1,16 @@
-import psycopg2, sys, traceback, StringIO, glob,tarfile, os
-import databaseConfig
+import sys, traceback, StringIO, glob,tarfile, os, databaseConfig
+try:
+    import psycopg2
+except:
+    traceback.print_exc()
+    print '\n\n******\nYou must download PsycoPG2, or your PsycoPG2 is out-of-date'
+    sys.exit(1)
+
 '''
 Utility methods shared across various individual action scripts
 '''
+
+log=True
 
 def connect():
     conn = psycopg2.connect(**databaseConfig.dbParams)
@@ -28,10 +36,4 @@ def execute(cursor, sql, *varargs):
         sql += ';'
     cursor.execute(sql, varargs)
 
-def clearTables(cursor):
-    result = raw_input('ARE YOU SURE YOU WANT TO DROP ALL TABLES?')
-    if result == 'y':
-        text(2,'DROPPING TABLES')
-        for table in ['Station', 'Observation', 'State', 'Country', 'Inventory']:
-            execute(cursor,'''DROP TABLE %s CASCADE;''' % table)
 

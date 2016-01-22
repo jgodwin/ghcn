@@ -1,18 +1,15 @@
 # Put in your database parameters here
 
-# Name of the DB that your user can log into to create a new DB
-# for default postgres installs, this should be 'postgres'
-masterDB = 'postgres'
-
-# Name of the new DB that will be created for this dataset
-newDB    = 'ghcn'
+# Name of the new DB that will be used
+db = 'ghcn'
 
 # Login info/credentials for your postgres installation
 dbParams = {
-    user='jgodwin',
-    password='password',
-    host='localhost',
-    port=5432
+    'database':db,
+    'user':'jgodwin',
+    'password':'password',
+    'host':'localhost',
+    'port':5432
 }
 
 ########### More config params #############
