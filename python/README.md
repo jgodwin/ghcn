@@ -1,10 +1,10 @@
 #Start here
 
 Contains python scripts used to initialize the database, to get started you will need:
--Python 2.7
--psycopg2
--PostgreSQL >9.4
--PostGIS > 2.0
+- Python 2.7
+- psycopg2
+- PostgreSQL >9.4
+- PostGIS > 2.0
 
 I do not provide instructions on how to install Postgres as it can be quite complicated or easy depending on your OS and local development environment. On Mac it is simplest to use Homebrew to install those packages.
 
