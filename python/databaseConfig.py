@@ -6,8 +6,8 @@ db = 'ghcn'
 # Login info/credentials for your postgres installation
 dbParams = {
     'database':db,
-    'user':'jgodwin',
-    'password':'password',
+    'user':'XXXXXXX',
+    'password':'YYYYYYY',
     'host':'localhost',
     'port':5432
 }
