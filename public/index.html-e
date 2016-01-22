@@ -16,12 +16,13 @@
       #map, #sideBar {display: inline-block; *display: inline; vertical-align: top} 
       #map {
         height:100%;
-        width:75%;
+        width:65%;
         background-color: #CCC;
+        overflow: auto;
       }
       #sideBar {
         height:100%;
-        width:25%;
+        width:35%;
         position: absolute;
       }
     </style>
@@ -39,10 +40,26 @@
     <div id="mapAndBar">
     <div id="map"></div>
     <div id="sideBar"> TEXT GOES HERE</div>
-     <script>
-        function drawPlot(observations){
+    <script>
+        var home="http://localhost:8080"
+        var urlStations=home+"/stations";
+        var urlInventory=home+"/inventory";
+        var urlObservation=home+"/observation";
+        var data = {'states' : 'CO'};
+        var map = null;
+
+        function histogram(dataSeries){
+            var bins = [];
+            dataSeries.forEach(
+                function(dataValues){
+                    
+                });
+        };
+        function drawPlot(station,element,observations){
             var series = [];
-            observations.forEach(function(observation){
+            var title = element+" - for Station:"+station;
+            observations.forEach(
+                function(observation){
                 var values = observation.data;
                 var name = observation.element.name;
                 var month = observation.month;
@@ -54,13 +71,14 @@
                 }
                 series.push({name: name, data: data});
             });
+            console.log(series.length);
             var sideBar = document.getElementById("sideBar");
             $('#sideBar').highcharts({
                     chart: {
                            type: 'spline'
                            },
                     title: {
-                           text: 'Snow depth at Vikjafjellet, Norway'
+                           text: title
                     },
                     subtitle: {
                         text: 'Irregular time data in Highcharts JS'
@@ -95,46 +113,28 @@
                     series: series
                     // Define the data points. All series have a dummy year
                     // of 1970/71 in order to be compared on the same x axis. Not
-    // that in JavaScript, months start at 0 for January, 1 for February etc.
-   });
-        };
+                    // that in JavaScript, months start at 0 for January, 1 for February etc.
+               });
+           };
 
-        function initialize(){
-            var mapCanvas = document.getElementById('map');
-            var mapOptions = {
-                center: new google.maps.LatLng(44.5403,-78.5463),
-                zoom: 5,
-                mapTypeId: google.maps.MapTypeId.ROADMAP
-            }
-            var map = new google.maps.Map(mapCanvas,mapOptions)
-
-            var url="http://localhost:8080/stations";
-            var urlInventory="http://localhost:8080/inventory";
-            var urlObservation="http://localhost:8080/observation";
-            var data = {'states' : 'CO'};
-            //var data = {};
-
-            $.getJSON(url,data,
-              function(data){
-                console.log('received: '+data.stations.length);
-                data.stations.forEach(function(station){
-                    var marker = new google.maps.Marker({
-                        position:{
-                            lat:station.latitude,
-                            lng:station.longitude},
-                        map:map,
-                        title:station.id
+           function showStations(stations){
+                stations.forEach(
+                    function(station){
+                        var marker = new google.maps.Marker({
+                            position:{
+                                lat:station.latitude,
+                                lng:station.longitude},
+                            map:map,
+                            title:station.id
                     });
                     marker.addListener('click', function() {
                         $.getJSON(urlInventory,
                             {'stations':station.id},function(data){
                           var text = 
-//                            '<p>'+
                             '<h3>Station Name: '+station.name+'</h3>'+
                             'Station ID: '+station.id +
                             '<br>'+
                             'Available Data: ';
-//                            '</p>';
                           data.forEach(function(inventory){
                             inventory.elements.forEach(function(element){
                             var butText = 
@@ -156,24 +156,42 @@
                             var i;
                             for(i =0; i < buttonList.length; i++){
                                 var button = buttonList[i];
-                                console.log(button.name);
-                                button.onclick = function(button) {
+                                button.onclick = function(button,station) {
                                     return function(){
                                   $.getJSON(urlObservation,
                                       {'stations':station.id, 
                                       'elements':button.name},
                                         function(observations){
-                                            drawPlot(observations);
+                                            drawPlot(station,button.name,stationobservations);
                                         });
                                     };
-                                }(button);
+                                }(button,station);
                             };
                           });
                           infowindow.open(map, marker);
                         });
                     });
-                });
+               });
+           };
+
+        function getStations(data){
+            $.getJSON(urlStations,data,
+              function(data){
+                console.log('received: '+data.stations.length);
+                showStations(data.stations)
               });
+        };
+
+        function initialize(){
+            var mapCanvas = document.getElementById('map');
+            var mapOptions = {
+                center: new google.maps.LatLng(44.5403,-78.5463),
+                zoom: 5,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            }
+            map = new google.maps.Map(mapCanvas,mapOptions);
+            // Get all stations
+            getStations({});
         }
     </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA42xJeCH1tapNwzg3elUgMgc9yVVLFgM0&callback=initialize"></script>

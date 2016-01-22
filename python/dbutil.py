@@ -13,6 +13,10 @@ Utility methods shared across various individual action scripts
 log=True
 
 def connect():
+    if databaseConfig.dbParams['user'] == None:
+        databaseConfig.dbParams['user'] = raw_input('Enter username: ')
+    if databaseConfig.dbParams['password'] == None:
+        databaseConfig.dbParams['password'] = raw_input('Enter password: ')
     conn = psycopg2.connect(**databaseConfig.dbParams)
     cursor = conn.cursor()
     return conn, cursor

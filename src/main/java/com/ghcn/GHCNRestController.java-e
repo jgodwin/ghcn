@@ -25,6 +25,12 @@ public class GHCNRestController {
 	private static <T> Set<T> toSet(T[] array){
 		return new HashSet<T>(Arrays.asList(array));
 	}
+
+//	@CrossOrigin
+//    @RequestMapping(value="/", method=RequestMethod.GET)
+//    public String index(){
+//        return "index";
+//    }
 	
 	@CrossOrigin
 	@RequestMapping(value="/observation", method=RequestMethod.GET)
@@ -55,14 +61,14 @@ public class GHCNRestController {
 //			return new Stations(dao.getStations(states));
 //		}
 			@RequestParam(name="states",required=false) String[] states){
-    	System.out.println("FETCHING: ");	
-    	for(String s: states){
-    		System.out.println("STATE: "+s);
-    	}
-    	
+   	
     	if (states == null || states.length == 0){
     		return new Stations(dao.getStations());
     	} else {
+            System.out.println("FETCHING: ");	
+            for(String s: states){
+                System.out.println("STATE: "+s);
+            }
     		return new Stations(dao.getStations(
     				toSet(states)));
     	}
