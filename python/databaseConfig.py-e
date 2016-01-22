@@ -1,0 +1,23 @@
+# Put in your database parameters here
+
+# Name of the new DB that will be used
+db = 'ghcn'
+
+# Login info/credentials for your postgres installation
+dbParams = {
+    'database':db,
+    'user':'XXXXXXX',
+    'password':'YYYYYYY',
+    'host':'localhost',
+    'port':5432
+}
+
+########### More config params #############
+
+# Data directory, where downloaded files will go
+dataDir='data'
+
+# If not None, will ONLY load the first N files from the data tarfile,
+# setting this number to a low value will avoid loading the entire database,
+# but still give you enough data to play with: recommended value - 1000
+subsetData=1000
