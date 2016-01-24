@@ -3,6 +3,7 @@ package com.ghcn;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +40,7 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	private static final String STATION_LATITUDE = "lat";
 	private static final String STATION_NAME = "name";
 	private static final String STATION_STATE="state";
+	private static final String STATION_LOCATION="location";
 	
 	private static final String OBSERVATION_VALUE_PREFIX="value";
 	private static final String OBSERVATION_MONTH="month";
@@ -55,6 +57,15 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 
 	private static String sub(String query, Object... cols){
 		return String.format(query, cols);
+	}
+	
+	private <T> List<T> query(String query, RowMapper<T> mapper, Object[] objs){
+		System.out.println("EXECUTING: "+query);
+		return jdbc.query(query, mapper, objs);
+	}
+	
+	private <T> List<T> query(String query, RowMapper<T> mapper){
+		return query(query, mapper, null);
 	}
 	
 	private static String buildInQuery(String col, Set<?> inObjects, boolean wantSemiColon){
@@ -75,17 +86,59 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 		this.jdbc = template;
 	}
 	
+    public List<Station> getStations(YearRange range){
+    	String qry = sub("SELECT * from %s where %s IN ", STATE_TABLE, STATION_ID)+
+    			sub("(SELECT DISTINCT %s from %s where %s <=? AND %s >=?", 
+    					STATION_ID, INVENTORY_TABLE, INVENTORY_FY, INVENTORY_LY);
+    	return query(qry, new StationMapper(), 
+    			new Object[]{range.getStartYear(),range.getEndYear()});
+    }
+    
+    @Override
+    public YearRange getFirstLastYearRange() {
+    	String qry = sub("SELECT min(%s), max(%s) from %s;",INVENTORY_FY,INVENTORY_LY,INVENTORY_TABLE);
+    	List<YearRange> results = query(qry, new RowMapper<YearRange>(){
+    		@Override
+    		public YearRange mapRow(ResultSet rs, int arg1) throws SQLException {
+    			// These column names are hardcoded from Postgres
+    			return new YearRange(rs.getInt("min"), rs.getInt("max"));
+    		}
+    	});
+    	if (results.size() > 0) return results.get(0);
+    	return new YearRange(2000,2016); // Fall back to default
+    }
+	
 	@Override
 	public List<Observation> getObservations(
 			Set<Station.Delegate> stations, 
-			Set<Element.Delegate> elements) {
+			Set<Element.Delegate> elements, YearRange years) {
 		String qry = sub("SELECT * FROM %s WHERE ", OBS_TABLE);
 		qry+=buildInQuery(STATION_ID, stations, false);
 		qry+=" AND "+buildInQuery(INVENTORY_ELEMENT, elements, true);
 		List<String> objs = new ArrayList<>();
 		stations.forEach((station) -> objs.add(station.getId()));
 		elements.forEach((element)-> objs.add(element.getName()));
-		return jdbc.query(qry, new ObservationElementMapper(), objs.toArray());
+		return query(qry, new ObservationElementMapper(), objs.toArray());
+	}
+	
+	@Override
+	public List<com.ghcn.Element.Delegate> getElements() {
+		List<com.ghcn.Element.Delegate> delegates = 
+			query(sub("Select distinct %s from %s;", INVENTORY_ELEMENT, INVENTORY_TABLE),
+				new RowMapper<Element.Delegate>(){
+			@Override
+			public com.ghcn.Element.Delegate mapRow(ResultSet rs, int rowNum) throws SQLException {
+				return new Element.Delegate(rs.getString(INVENTORY_ELEMENT));
+			}
+		});
+		//We want these sorted in most cases, or we could introduce arbitrary sorting / aliasing here
+		delegates.sort(new Comparator<Element.Delegate>(){
+			@Override
+			public int compare(com.ghcn.Element.Delegate o1, com.ghcn.Element.Delegate o2) {
+				return o1.getName().compareTo(o2.getName());
+			}
+		});
+		return delegates;
 	}
 	
 @Override
@@ -96,7 +149,7 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 				buildInQuery(STATION_ID, stations, true);
 		Set<String> sids = new HashSet<>();
 		stations.forEach((delegate) -> sids.add(delegate.getId()));
-		List<Element> query = jdbc.query(qry, new InventoryElementMapper(), sids.toArray());
+		List<Element> query = query(qry, new InventoryElementMapper(), sids.toArray());
 		Map<String,Set<Element>> stationMap = new HashMap<>();
 		query.forEach((element)-> {
 			String sid = element.getStation().getId();
@@ -113,22 +166,69 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	}
 
 	@Override
+	public List<String> getStates() {
+		String qry = sub("Select DISTINCT %s from %s",STATION_STATE,STATION_TABLE);
+		return query(qry, new RowMapper<String>(){
+			@Override
+			public String mapRow(ResultSet rs, int rowNum) throws SQLException {
+				return rs.getString(STATION_STATE);
+			}
+		});
+	}
+
+	@Override
 	public List<Station> getStations() {
-		return jdbc.query(
-				sub("SELECT * FROM %s WHERE %s in (select distinct %s from %s);",
-						STATION_TABLE,STATION_ID,STATION_ID,INVENTORY_TABLE), new StationMapper());
+		return query(
+				sub("SELECT * FROM %s;",
+						STATION_TABLE), new StationMapper());
 	}
 	@Override
-	public List<Station> getStations(Set<String> states) {
+	public List<Station> getStations(Set<String> states, Set<String> countries, Set<Element.Delegate> elements, 
+			BoundingBox box, YearRange years) {
+		if (states.size() == 0 && countries.size() == 0 && elements.size() == 0 && 
+				years == null && box == null) return getStations();
+		
 		//Ugly because Postgres does not support mapping Sets or Lists to single ? fields,
 		// as apparently MySql and others do =(
 		String query = sub(
 				"SELECT %s, %s, %s, %s FROM %s WHERE ", 
 					STATION_ID, STATION_NAME, STATION_LATITUDE, STATION_LONGITUDE, STATION_TABLE);
-		query+=buildInQuery(STATION_STATE, states, false);
-		query+=sub(" AND %s in (select distinct %s from %s);",STATION_ID,STATION_ID,INVENTORY_TABLE);
-		return jdbc.query(query,
-				new StationMapper(),states.toArray() );
+		List<Object> params = new ArrayList<>();
+		boolean other = false;
+		if (states.size() > 0){
+			query+=buildInQuery(STATION_STATE, states, false);
+			params.addAll(states);
+			other = true;
+		}
+		if (countries.size() > 0){
+			//TODO add country column, and add country filtering
+		}
+		if (elements.size() > 0){
+			if (other) query+=" AND ";
+			query+=sub("%s in (SELECT DISTINCT %s from %s where ",
+					STATION_ID, STATION_ID, INVENTORY_TABLE)+buildInQuery(INVENTORY_ELEMENT, elements, false);
+			params.addAll(elements);
+			other = true;
+		}
+		if (box != null){
+			if (other) query+=" AND ";
+			query+=sub("ST_Intersects(ST_MakeEnvelope(?,?,?,?,4326),%s)", STATION_LOCATION);
+			params.add(box.getMinLong());
+			params.add(box.getMinLat());
+			params.add(box.getMaxLong());
+			params.add(box.getMaxLat());
+			other = true;
+		}
+		if (years != null){
+			if (other) query+=" AND ";
+			query+=sub("%s IN (SELECT DISTINCT %s from %s where %s <=? AND %s >=?)", 
+					STATION_ID,STATION_ID, INVENTORY_TABLE, INVENTORY_FY, INVENTORY_LY);
+			params.add(years.getStartYear());
+			params.add(years.getEndYear());
+		}
+		query+=";";
+		return query(query,
+				new StationMapper(),params.toArray());
 	}
 	
 	private static class ObservationElementMapper implements RowMapper<Observation> {
@@ -162,7 +262,7 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 			return new Element(
 					new Station.Delegate(rs.getString(STATION_ID)), 
 					rs.getString(INVENTORY_ELEMENT), 
-						new Inventory.YearRange(
+						new YearRange(
 							rs.getInt(INVENTORY_FY), rs.getInt(INVENTORY_LY)));
 		}
 	}

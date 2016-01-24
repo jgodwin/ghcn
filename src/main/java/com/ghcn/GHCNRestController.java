@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
+@CrossOrigin
 @RestController
 public class GHCNRestController {
 	
@@ -23,59 +24,49 @@ public class GHCNRestController {
 	}
 	
 	private static <T> Set<T> toSet(T[] array){
+		if (array == null) return new HashSet<T>();
 		return new HashSet<T>(Arrays.asList(array));
 	}
-
-//	@CrossOrigin
-//    @RequestMapping(value="/", method=RequestMethod.GET)
-//    public String index(){
-//        return "index";
-//    }
 	
-	@CrossOrigin
+	@RequestMapping(value="/elements", method=RequestMethod.GET)
+	public List<Element.Delegate> getElements(){
+		return dao.getElements();
+	}
+	
+	@RequestMapping(value="/states")
+	public List<String> getStates(){
+		return dao.getStates();
+	}
+
 	@RequestMapping(value="/observation", method=RequestMethod.GET)
 	public List<Observation> fetchObservations(
 			@RequestParam(name="stations",required=true) Station.Delegate[] stations,
-			@RequestParam(name="elements",required=true) Element.Delegate[] elements){
-		
+			@RequestParam(name="elements",required=true) Element.Delegate[] elements,
+			@RequestParam(name="years", required=false) YearRange years){
 		return dao.getObservations(
-				toSet(stations), toSet(elements));
+				toSet(stations), toSet(elements), years);
 	}
 	
-	@CrossOrigin
 	@RequestMapping(value="/inventory", method=RequestMethod.GET)
 	public List<Inventory> fetchInventories(@RequestParam(name="stations",required=true) 
 		Station.Delegate[] delegates){
 		return dao.getInventory(toSet(delegates));
 	}
 	
-    @CrossOrigin
+	@RequestMapping(value="/years", method=RequestMethod.GET)
+	public YearRange getYearRange(){
+		return dao.getFirstLastYearRange();
+	}
+	
 	@RequestMapping(value="/stations",method=RequestMethod.GET)
 	public Stations fetchStations(
-//			@RequestParam(name="states",defaultValue="",required=false) String rawStates){
-//		if ("".equals(rawStates)) return new Stations(dao.getStations());
-//		else {
-//			Set<String> states = new HashSet<>();
-//			String[] split = rawStates.split(",");
-//			for(String state: split) states.add(state);
-//			return new Stations(dao.getStations(states));
-//		}
-			@RequestParam(name="states",required=false) String[] states){
-   	
-    	if (states == null || states.length == 0){
-    		return new Stations(dao.getStations());
-    	} else {
-            System.out.println("FETCHING: ");	
-            for(String s: states){
-                System.out.println("STATE: "+s);
-            }
-    		return new Stations(dao.getStations(
-    				toSet(states)));
-    	}
+			@RequestParam(name="countries", required=false) String[] countries,
+			@RequestParam(name="states",required=false) String[] states,
+			@RequestParam(name="elements",required=false) Element.Delegate[] elements,
+			@RequestParam(name="bbox", required=false) BoundingBox box,
+			@RequestParam(name="years", required=false) YearRange years){
+    		return new Stations(
+    				dao.getStations(
+    				toSet(states), toSet(countries),toSet(elements),box, years));
 	}
-//    Does not work...?
-//    @RequestMapping({"/","/home"})
-//    public String showHome(){
-//    	return "/resources/index.jsp";
-//    }
 }

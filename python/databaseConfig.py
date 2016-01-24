@@ -1,3 +1,4 @@
+import os
 # Put in your database parameters here
 
 # Name of the new DB that will be used
@@ -6,13 +7,16 @@ db = 'ghcn'
 # Login info/credentials for your postgres installation
 dbParams = {
     'database':db,
-    'user':'XXXXXXX',
-    'password':'YYYYYYY',
+    'user':os.environ.get('POSTGRES_USER'),
+    'password':os.environ.get('POSTGRES_PW'),
     'host':'localhost',
     'port':5432
 }
 
 ########### More config params #############
+
+# Google Geocoding API Key
+geoAPIKey = os.environ.get('GEOCODE_API_KEY')
 
 # Data directory, where downloaded files will go
 dataDir='data'

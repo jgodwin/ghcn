@@ -27,22 +27,4 @@ public class Inventory {
 	public Set<Element> getElements() {
 		return elements;
 	}
-	
-	/**
-	 * A span of time, given as a range of years, inclusive.
-	 */
-	public static class YearRange {
-		private int startYear;
-		private int endYear;
-		public YearRange(int start, int end){
-			startYear = start;
-			endYear = end;
-		}
-		public int getEndYear() {
-			return endYear;
-		}
-		public int getStartYear() {
-			return startYear;
-		}
-	}
 }

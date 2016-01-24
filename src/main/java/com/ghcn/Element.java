@@ -1,6 +1,5 @@
 package com.ghcn;
 
-import com.ghcn.Inventory.YearRange;
 import com.ghcn.Station.Delegate;
 
 /**

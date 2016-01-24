@@ -12,41 +12,211 @@
       #mapAndBar {
         height:100%;
         width:100%;
-      }
-      #map, #sideBar {display: inline-block; *display: inline; vertical-align: top} 
+    }
+    .filter{
+        margin: auto;
+    }
+    .filterCombo{
+        width: 100px;
+    }
+      /* #map, #sideBar {display: inline-block; *display: inline; vertical-align: top}*/ 
       #map {
-        height:100%;
-        width:65%;
+        height:50%;
+        width:100%;
         background-color: #CCC;
         overflow: auto;
       }
       #sideBar {
-        height:100%;
-        width:35%;
-        position: absolute;
+        display: flex;
+        height:10%;
+        width:100%;
+      }
+      #year-range {
+        width:75%;
       }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+
   </head>
   <body>
-    <title id="test">TEST</title>
-    <div id="filters">
-        <select name="States:">
-            <option value="CO">CO</select>
-        </select>
-    </div>
+    <title id="test">GHCN Viewer</title>
     <div id="mapAndBar">
-    <div id="map"></div>
-    <div id="sideBar"> TEXT GOES HERE</div>
+    <div id="sideBar"> 
+            <div class="filter">
+                 Countries: 
+                 <select 
+                     id="countries-select" class="filterCombo" multiple name="States:">
+                    </select>
+            </div>
+
+            <div id="states" class="filter">
+                    States:
+                    <select 
+                        id="states-select" class="filterCombo" multiple name="States:">
+                </select>
+            </div>
+
+            <div class="filter">
+                Measurement: 
+                <select id="elements-select" class="filterCombo" multiple name="Measurements: ">
+                </select>
+            </div>
+
+            <div id="year-values" 
+                 style="width: 150px;" class="filter">
+                  <input type="text" id="amount" 
+                    readonly style="border:0;">
+                 <div id="year-range" ></div>
+             </div>
+             <!--            </div> -->
+            <div class="filter">
+            <button id="show-bbox-button">Add Bounding Box</button>
+            <button id="apply-button">Show Stations Passing Filters</button>
+            <input type="text" id="passingCount" readonly style="border:0;">
+            </div>
+
+   </div>
+ 
+   <div id="map"></div>
+   <div id="plot"></div>
     <script>
         var home="http://localhost:8080"
         var urlStations=home+"/stations";
         var urlInventory=home+"/inventory";
         var urlObservation=home+"/observation";
+        var urlYears=home+"/years";
+        var urlElements=home+"/elements";
         var data = {'states' : 'CO'};
         var map = null;
+        var bboxRectangle = null;
+
+
+        function countPassingStations(){
+            getStationsWithFilters(function(stations){
+                $("#passingCount").val("Passing Stations: "+stations.length);
+            });
+        };
+
+        $(function(){
+            $.getJSON(urlYears,{},function(years){
+                $("#year-range").slider({
+                    range: true,
+                    values: [2001,2005],
+                    min: years.startYear, 
+                    max: years.endYear,
+                    slide: function(event, ui){
+                        $("#amount").val("Years: "+ui.values);
+                        countPassingStations();
+                    }
+                });
+                $("#amount").val("Years: "+$("#year-range").slider("values"));
+            });
+
+            $.getJSON(urlElements,{}, function(elements){
+                elements.forEach(function(element){
+                    var name = element.name;
+                    $("#elements-select").append(
+                        $("<option></option>")
+                            .attr("value",name)
+                            .text(name));
+                    });
+                });
+
+             drawPlot("","",[]);
+             $("#passingCount").val("Passing Stations: "+0);
+            });
+
+        $("#show-bbox-button").click(function(){
+            if (bboxRectangle != null){
+                bboxRectangle.setMap(null);
+                bboxRectangle = null;
+                $("#show-bbox-button").text("Add Bounding Box");
+            } else {
+            var mapBounds = map.getBounds();
+            var center = mapBounds.getCenter();
+            var span   = mapBounds.toSpan();
+            var dlat = span.lat() / 4;
+            var dlng = span.lng() / 4;
+
+                var bounds = {
+                    north: center.lat()+dlat,
+                    south: center.lat()-dlat,
+                    east: center.lng()+dlng,
+                    west: center.lng()-dlng
+                };
+                bboxRectangle = 
+                    new google.maps.Rectangle({
+                    bounds: bounds,
+                    editable: true,
+                    draggable: true
+                });
+                bboxRectangle.setMap(map);
+                $("#show-bbox-button").text("Remove Bounding Box");
+            }
+        });
+
+        function buildFilters(){
+            var years = $("#year-range").slider("values");
+            var element = $("#elements-select").val() || [];
+            var states = $("#states-select").val() || [];
+            var countries = $("#countries-select").val() || [];
+            var bbox = [];
+            if (bboxRectangle != null){
+                var bounds = bboxRectangle.getBounds();
+                bbox = [
+                    bounds.getSouthWest().lat(),
+                    bounds.getSouthWest().lng(),
+                    bounds.getNorthEast().lat(),
+                    bounds.getNorthEast().lng()
+                ];
+            }
+            var filters = {};
+            if (years != null) filters['years'] = years.toString();
+            if (element.length > 0 ) filters['elements'] = element.toString();
+            if (states.length > 0) filters['states'] = states.toString();
+            if (countries.length > 0) filters['countries'] = countries.toString();
+            if (bbox.length > 0) filters['bbox'] = bbox.toString();
+            return filters;
+        };
+
+        function getStations(pars, callback){
+            $.getJSON(urlStations,pars,
+              function(data){
+                  console.log(
+                    'received: '+data.stations.length);
+                  callback(data);
+              }
+              );
+        };
+
+        function getStationsWithFilters(stationCallback){
+            var filters = buildFilters();
+            getStations(filters, function(data){
+                stationCallback(data.stations);
+            });
+        };
+
+        $("states-select").change(function(){
+            countPassingStations();
+        });
+
+        $("countries-select").change(function(){
+            countPassingStations();
+        });
+        
+        $("elements-select").change(function(){
+            countPassingStations();
+        });
+
+        $("#apply-button").click(function(){
+            getStationsWithFilters(function(stations){
+                showStations(stations);
+            });
+        });
 
         function histogram(dataSeries){
             var bins = [];
@@ -73,7 +243,7 @@
             });
             console.log(series.length);
             var sideBar = document.getElementById("sideBar");
-            $('#sideBar').highcharts({
+            $('#plot').highcharts({
                     chart: {
                            type: 'spline'
                            },
@@ -116,8 +286,16 @@
                     // that in JavaScript, months start at 0 for January, 1 for February etc.
                });
            };
+           
+           markers=[];
+           function deleteMarkers(){
+               markers.forEach(function(marker){
+                   marker.setMap(null);
+               });
+           };
 
            function showStations(stations){
+                deleteMarkers();
                 stations.forEach(
                     function(station){
                         var marker = new google.maps.Marker({
@@ -126,7 +304,8 @@
                                 lng:station.longitude},
                             map:map,
                             title:station.id
-                    });
+                        });
+                        markers.push(marker);
                     marker.addListener('click', function() {
                         $.getJSON(urlInventory,
                             {'stations':station.id},function(data){
@@ -174,14 +353,6 @@
                });
            };
 
-        function getStations(data){
-            $.getJSON(urlStations,data,
-              function(data){
-                console.log('received: '+data.stations.length);
-                showStations(data.stations)
-              });
-        };
-
         function initialize(){
             var mapCanvas = document.getElementById('map');
             var mapOptions = {
@@ -191,7 +362,7 @@
             }
             map = new google.maps.Map(mapCanvas,mapOptions);
             // Get all stations
-            getStations({});
+            // getStations({});
         }
     </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA42xJeCH1tapNwzg3elUgMgc9yVVLFgM0&callback=initialize"></script>
