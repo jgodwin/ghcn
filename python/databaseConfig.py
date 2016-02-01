@@ -24,4 +24,4 @@ dataDir='data'
 # If not None, will ONLY load the first N files from the data tarfile,
 # setting this number to a low value will avoid loading the entire database,
 # but still give you enough data to play with: recommended value - 1000
-subsetData=1000
+subsetData=None

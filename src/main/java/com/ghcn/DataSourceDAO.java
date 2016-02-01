@@ -23,7 +23,7 @@ public interface DataSourceDAO {
 	 * @return
 	 */
 	public List<Observation> getObservations(
-			Set<Station.Delegate> stations, Set<Element.Delegate> elements,  YearRange years);
+			Set<Station.Delegate> stations, Element.Delegate elements,  YearRange years);
 	
 	/**
 	 * Get the inventories for each station.

@@ -44,19 +44,22 @@ public class Station {
 	 * about the station.  This allows client code to send only station IDs back
 	 * to the server to make further queries.
 	 */
-	public static class Delegate {
+	public static class Delegate implements Comparable<Delegate>{
 		private String id;
 		public Delegate(String id){
 			this.id = id;
 		}
-		/**
-		 * DO NOT CALL, only used by Spring to instantiate through reflection with setter
-		 */
+		
 		public Delegate(){
 			
 		}
 		public String getId() {
 			return id;
+		}
+		
+		@Override
+		public int compareTo(Delegate o) {
+			return id.compareTo(o.id);
 		}
 		
 		public void setId(String id) {
@@ -68,12 +71,10 @@ public class Station {
 		}
 		@Override
 		public boolean equals(Object obj) {
-			if (obj == null) return false;
-			else if (obj.getClass().getName().equals(getClass().getName())){
+			if (obj == null || obj.getClass() != getClass()) return false;
+			else {
 				return ((Delegate)obj).id.equals(id);
-			} else {
-				return false;
-			}
+			} 
 		}
 	}
 }

@@ -1,6 +1,7 @@
 import psycopg2, sys, traceback, StringIO, glob,tarfile, os
 from dbutil import *
 import databaseConfig
+import units
 
 gzFile = 'ghcnd_all.tar.gz'
 states = 'ghcnd-states.txt'
@@ -8,6 +9,8 @@ inventory='ghcnd-inventory.txt'
 countries='ghcnd-countries.txt'
 stations ='ghcnd-stations.txt'
 
+# delimiter to use for postgres bulkload
+delim = '\t'
 # Given a line of text with fixed width cols in it, and a list of columns, 
 # that correspond to the indices in the text to extract, extract each column
 # and return the values in a list
@@ -27,7 +30,6 @@ def splitFixedWidthCols(line, cols=[]):
 # and then convert to a delimited format as the files are originally 
 # in fixed column format, which cannot use postgres bulk load function
 def loadAndSplitFile(fileName,cols,table,cursor,fileLike=None):
-    delim = '\t'
     f = StringIO.StringIO()
     print 'LOADING FILE: ' + fileName
     fr = open(dataPath(fileName),'r') if fileLike==None else fileLike
@@ -41,6 +43,14 @@ def loadAndSplitFile(fileName,cols,table,cursor,fileLike=None):
     f.flush()
     f.seek(0)
     cursor.copy_from(f,table,sep=delim)
+    f.close()
+   
+def loadUnits(cursor):
+    f = StringIO.StringIO()
+    units.writeUnits(f,delim)
+    f.flush()
+    f.seek(0)
+    cursor.copy_from(f,'Unit',sep=delim)
     f.close()
 
 def loadStates(cursor):
@@ -104,19 +114,13 @@ def createIndexes(cursor):
     # Index inventories for faster queries on sid and/or element
     execute(cursor,
       '''
-      CREATE INDEX idx_inventory_primary on Inventory (sid,element);
+      CREATE INDEX idx_inventory_primary on Inventory (sid,element,firstyear,lastyear);
       ''')
-    # Index inventories for faster queries on element and times
-    execute(cursor,
-      '''
-      CREATE INDEX idx_inventory_element_time on Inventory (element,firstyear,lastyear);
-      ''')
-
     # Stations already has an index on sid as it is a primary key
     # Make an index for locations for spatial queries
     execute(cursor,
       '''
-      CREATE INDEX idx_station_location on Station USING GIST(location);
+      CREATE INDEX idx_station_location on Station(location);
       ''')
     # Index observations on sid and element and year and month
     # This is the very long running indexing operation, which should
@@ -130,7 +134,7 @@ def createIndexes(cursor):
 def addLocationColumn(cursor):
     # 4326 represents WGS84
     execute(cursor,
-            '''ALTER TABLE Station ADD COLUMN location geography(Point,4326);''')
+            '''ALTER TABLE Station ADD COLUMN location geometry(Point,4326);''')
 
 def loadData(cursor):
     #TODO: wrap each in separate transaction
@@ -139,6 +143,7 @@ def loadData(cursor):
     loadCountries(cursor)
     loadInventory(cursor)
     loadObservations(cursor)
+    loadUnits(cursor)
     
 def main():
    conn,cursor = connect() 

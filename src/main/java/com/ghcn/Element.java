@@ -6,7 +6,7 @@ import com.ghcn.Station.Delegate;
  * An element represents a single set of related physical observations for
  * a particular station, that span a time range.
  */
-public class Element {
+public class Element implements Comparable<Element> {
 	private String name;
 	private YearRange range;
 	private Station.Delegate station;
@@ -17,6 +17,10 @@ public class Element {
 	}
 	public String getName() {
 		return name;
+	}
+	@Override
+	public int compareTo(Element o) {
+		return name.compareTo(o.name);
 	}
 	public Station.Delegate getStation() {
 		return station;
@@ -51,11 +55,10 @@ public class Element {
 		
 		@Override
 		public boolean equals(Object obj) {
-			if (obj == null) return false;
-			else if (obj.getClass().getName().equals(getClass().getName())){
+			if (obj == null || obj.getClass() != getClass()) return false;
+			else {
 				return ((Delegate)obj).name.equals(name);
 			}
-			return false;
 		}
 	}
 }

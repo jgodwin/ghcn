@@ -41,10 +41,10 @@ public class GHCNRestController {
 	@RequestMapping(value="/observation", method=RequestMethod.GET)
 	public List<Observation> fetchObservations(
 			@RequestParam(name="stations",required=true) Station.Delegate[] stations,
-			@RequestParam(name="elements",required=true) Element.Delegate[] elements,
+			@RequestParam(name="elements",required=true) Element.Delegate elements,
 			@RequestParam(name="years", required=false) YearRange years){
 		return dao.getObservations(
-				toSet(stations), toSet(elements), years);
+				toSet(stations), elements, years);
 	}
 	
 	@RequestMapping(value="/inventory", method=RequestMethod.GET)

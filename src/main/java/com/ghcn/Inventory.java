@@ -1,5 +1,8 @@
 package com.ghcn;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -10,7 +13,7 @@ import java.util.Set;
  */
 public class Inventory {
 	private Station.Delegate station;
-	private Set<Element> elements;
+	private List<Element> elements;
 	
 	/**
 	 * @param delegate a representation of the station that this inventory belongs to
@@ -19,12 +22,19 @@ public class Inventory {
 	 */
 	public Inventory(Station.Delegate delegate, Set<Element> elements){
 		this.station = delegate;
-		this.elements = elements;
+		this.elements = new ArrayList<>(elements);
+		// Want these sorted, so that they make sense to the user
+		this.elements.sort(new Comparator<Element>(){
+			@Override
+			public int compare(Element o1, Element o2) {
+				return o1.compareTo(o2);
+			}
+		});
 	}
 	public Station.Delegate getDelegate() {
 		return station;
 	}
-	public Set<Element> getElements() {
+	public List<Element> getElements() {
 		return elements;
 	}
 }

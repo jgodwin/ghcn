@@ -58,6 +58,18 @@ def buildObservationTable(cursor):
         ELEMENT CHAR(4) NOT NULL,
         %s)
         ''' % dailyColumnHeaders())
+def buildUnitTable(cursor):
+    execute(cursor,'''CREATE TABLE Unit(
+        ELEMENT CHAR(4) PRIMARY KEY,
+        CONVERSION FLOAT NOT NULL,
+        SIUNIT VARCHAR NOT NULL,
+        DESCRIPTION VARCHAR NOT NULL)''')
+
+def buildStationCountryTable(cursor):
+    execute(cursor,'''CREATE TABLE StationToCountry(
+        SID CHAR(11) NOT NULL references Station(SID) ON DELETE CASCADE,
+        CODE CHAR(2) NOT NULL references Country(CODE) ON DELETE CASCADE)
+        ''')
 
 def addPostGIS(cursor):
     execute(cursor,'''CREATE EXTENSION postgis;''')
@@ -68,6 +80,8 @@ def buildTables(cursor):
     buildObservationTable(cursor)
     buildCountryTable(cursor)
     buildInventoryTable(cursor)
+    buildUnitTable(cursor)
+    buildStationCountryTable(cursor)
 
 def main():
   conn,cursor = connect()

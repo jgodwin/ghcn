@@ -14,10 +14,12 @@
         width:100%;
     }
     .filter{
-        margin: auto;
+        width: 100px;
+        position:relative;
     }
     .filterCombo{
         width: 100px;
+        height: 75px;
     }
       /* #map, #sideBar {display: inline-block; *display: inline; vertical-align: top}*/ 
       #map {
@@ -27,12 +29,17 @@
         overflow: auto;
       }
       #sideBar {
-        display: flex;
-        height:10%;
+          display: flex;
+          align-items: bottom;
+        height:15%;
         width:100%;
       }
       #year-range {
         width:75%;
+      }
+      #plot {
+          width: 100%;
+          height: 35%;
       }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
@@ -44,16 +51,14 @@
   </head>
   <body>
     <title id="test">GHCN Viewer</title>
-    <div id="mapAndBar">
     <div id="sideBar"> 
-            <div class="filter">
-                 Countries: 
-                 <select 
-                     id="countries-select" class="filterCombo" multiple name="States:">
+        <div class="filter">
+            Countries:
+            <select id="countries-select" class="filterCombo" multiple name="Countries:">
                     </select>
-            </div>
+                </div>
 
-            <div id="states" class="filter">
+                <div id="states" class="filter">
                     States:
                     <select 
                         id="states-select" class="filterCombo" multiple name="States:">
@@ -76,6 +81,9 @@
             <div class="filter">
             <button id="show-bbox-button">Add Bounding Box</button>
             <button id="apply-button">Show Stations Passing Filters</button>
+            </div>
+    
+            <div class="filter">
             <input type="text" id="passingCount" readonly style="border:0;">
             </div>
 
@@ -126,7 +134,7 @@
                     });
                 });
 
-             drawPlot("","",[]);
+//             drawPlot("","",[]);
              $("#passingCount").val("Passing Stations: "+0);
             });
 
@@ -227,25 +235,96 @@
         };
         function drawPlot(station,element,observations){
             var series = [];
-            var title = element+" - for Station:"+station;
+            var title = element+" - for Station:"+station.id;
             observations.forEach(
                 function(observation){
-                var values = observation.data;
+                var allValues = observation.data;
                 var name = observation.element.name;
-                var month = observation.month;
-                var year = observation.year;
+                var months = observation.month;
                 var data = [];
-                var day;
-                for(day = 0; day < values.length; day++){
-                    data.push([Date.UTC(year, month, day+1), values[day]]);
-                }
-                series.push({name: name, data: data});
+                var years = observation.year;
+                var nobs = years.length;
+//                for(obs=0; obs < nobs; obs++){
+//                    var year = years[obs];
+//                    var month = months[obs];
+//                    var values = allValues[obs];
+//                    for(var day = 0; day < values.length; day++){
+//                        data.push([Date.UTC(year, month, day+1), values[day], null,null,null]);
+//                    }
+//                    series.push({name: name, data: data});
+//                }
+                series.push({name: name, data: allValues});
             });
+
             console.log(series.length);
             var sideBar = document.getElementById("sideBar");
+
+            // create the chart
+//            $('#plot').highcharts('StockChart', {
+//                 chart : {
+//                        type: 'line',
+//                        zoomType: 'x'
+//                 },
+//                 navigator : {
+//                     adaptToUpdatedData: false,
+//                        series : {
+//                            data :data
+//                        }
+//               },
+//               scrollbar: {
+//                       liveRedraw: false
+//                       },
+//               title: {
+//                   text: 'AAPL history by the minute from 1998 to 2011'
+//               },
+//                subtitle: {
+//                    text: 'Displaying 1.7 million data points in Highcharts Stock by async server loading'
+//               },
+//               rangeSelector : {
+//                   buttons: [{
+//                       type: 'hour',
+//                       count: 1,
+//                       text: '1h'
+//                   }, {
+//                       type: 'day',
+//                       count: 1,
+//                       text: '1d'
+//                   }, {
+//                       type: 'month',
+//                       count: 1,
+//                       text: '1m'
+//                   }, {
+//                       type: 'year',
+//                       count: 1,
+//                       text: '1y'
+//                   }, {
+//                       type: 'all',
+//                       text: 'All'
+//                   }],
+//               inputEnabled: false, // it supports only days
+//               selected : 4 // all
+//               },
+//               xAxis : {
+////                   events : {
+////                       afterSetExtremes : afterSetExtremes
+////                   },
+//                   minRange: 3600 * 1000 // one hour
+//               },
+//               yAxis: {
+//                   floor: 0
+//               },
+//               series : [{
+//                   data : data,
+//                   dataGrouping: {
+//                       enabled:false
+//                   }
+//               }]
+//           });
+//            
             $('#plot').highcharts({
                     chart: {
-                           type: 'spline'
+                           zoomType: 'x',
+                           type: 'line'
                            },
                     title: {
                            text: title
@@ -255,10 +334,10 @@
                     },
                     xAxis: {
                         type: 'datetime',
-                        dateTimeLabelFormats: { // don't display the dummy year
-                        month: '%e. %b',
-                        year: '%b'
-                    },
+//                        dateTimeLabelFormats: { // don't display the dummy year
+//                        month: '%e. %b',
+//                        year: '%b'
+//                    },
                     title: {
                     text: 'Date'
                     }
@@ -267,11 +346,10 @@
                     title: {
                     text: 'Snow depth (m)'
                     },
-                    min: 0
                     },
                     tooltip: {
                     headerFormat: '<b>{series.name}</b><br>',
-                    pointFormat: '{point.x:%e. %b}: {point.y:.2f} m'
+                    pointFormat: '{point.x:%e. %b %Y}: {point.y:.2f} m'
                     },
                     plotOptions: {
                     spline: {
@@ -285,6 +363,7 @@
                     // of 1970/71 in order to be compared on the same x axis. Not
                     // that in JavaScript, months start at 0 for January, 1 for February etc.
                });
+
            };
            
            markers=[];
@@ -341,7 +420,7 @@
                                       {'stations':station.id, 
                                       'elements':button.name},
                                         function(observations){
-                                            drawPlot(station,button.name,stationobservations);
+                                            drawPlot(station,button.name,observations);
                                         });
                                     };
                                 }(button,station);

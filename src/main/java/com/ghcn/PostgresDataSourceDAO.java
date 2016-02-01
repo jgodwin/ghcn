@@ -3,11 +3,13 @@ package com.ghcn;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.sql.DataSource;
@@ -47,13 +49,17 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	private static final String OBSERVATION_YEAR="year";
 	private static final String OBSERVATION_ELEMENT="element";
 	private static final int OBSERVATION_NUM_COLS=31;
-	private static final float OBSERVATION_NULL_VALUE=-9999f;
+	private static final float OBSERVATION_NULL_VALUE=-9999.0f;
 	
 	private static final String STATION_TABLE="Station";
 	private static final String INVENTORY_TABLE="Inventory";
 	private static final String OBS_TABLE="Observation";
 	private static final String STATE_TABLE="State";
 	private static final String COUNTRY_TABLE="Country";
+	private static final String UNIT_TABLE="Unit";
+	
+	private static final String UNIT_ELEMENT = "element";
+	
 
 	private static String sub(String query, Object... cols){
 		return String.format(query, cols);
@@ -111,14 +117,49 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 	@Override
 	public List<Observation> getObservations(
 			Set<Station.Delegate> stations, 
-			Set<Element.Delegate> elements, YearRange years) {
+			Element.Delegate element, YearRange years) {
+		Set<Element.Delegate> elements = Collections.singleton(element);
 		String qry = sub("SELECT * FROM %s WHERE ", OBS_TABLE);
 		qry+=buildInQuery(STATION_ID, stations, false);
 		qry+=" AND "+buildInQuery(INVENTORY_ELEMENT, elements, true);
 		List<String> objs = new ArrayList<>();
 		stations.forEach((station) -> objs.add(station.getId()));
-		elements.forEach((element)-> objs.add(element.getName()));
-		return query(qry, new ObservationElementMapper(), objs.toArray());
+		elements.forEach((e)-> objs.add(e.getName()));
+		List<SingleMonthObservation> months = query(qry, new SingleMonthObservationElementMapper(), objs.toArray());
+		Map<Station.Delegate, Set<SingleMonthObservation>> obsMap = new HashMap<>();
+		for(SingleMonthObservation obs: months){
+			Set<SingleMonthObservation> observations = obsMap.containsKey(obs.delegate) ? 
+					obsMap.get(obs.delegate) : new HashSet<>();
+			observations.add(obs);
+			obsMap.put(obs.delegate, observations);
+		}
+		List<Observation> observations = new ArrayList<>();
+		for(Entry<Station.Delegate, Set<SingleMonthObservation>> pair: obsMap.entrySet()){
+			Delegate delegate = pair.getKey();
+			Set<SingleMonthObservation> monthObservations = pair.getValue();
+			int n = monthObservations.size();
+			int[] monthArray = new int[n];
+			int[] yearArray  = new int[n];
+			float[][] vals = new float[n][];
+			int i = 0; 
+			List<SingleMonthObservation> sortedObservations = new ArrayList<>(monthObservations);
+			sortedObservations.sort(new Comparator<SingleMonthObservation>(){
+				@Override
+				public int compare(SingleMonthObservation o1, SingleMonthObservation o2) {
+					int result = Integer.compare(o1.year, o2.year);
+					if (result == 0) result = Integer.compare(o1.month, o2.month);
+					return result;
+				}
+			});
+			for(SingleMonthObservation mo: sortedObservations){
+				monthArray[i] = mo.month;
+				yearArray[i] = mo.year;
+				vals[i] = mo.values;
+				i++;
+			}
+			observations.add(new Observation(delegate, element, yearArray, monthArray, vals, OBSERVATION_NULL_VALUE));
+		}
+		return observations;
 	}
 	
 	@Override
@@ -212,11 +253,22 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 		}
 		if (box != null){
 			if (other) query+=" AND ";
-			query+=sub("ST_Intersects(ST_MakeEnvelope(?,?,?,?,4326),%s)", STATION_LOCATION);
+			// This should work now that we're storing as geometry instead of geography
+			query+=sub(
+					"ST_Intersects(ST_MakeEnvelope(?,?,?,?,4326),%s)",
+					STATION_LOCATION);
 			params.add(box.getMinLong());
 			params.add(box.getMinLat());
 			params.add(box.getMaxLong());
 			params.add(box.getMaxLat());
+//			query+=sub(
+//			" %s BETWEEN ? AND ? AND %s BETWEEN ? AND ?",
+//			STATION_LATITUDE, STATION_LONGITUDE);
+			// Params needed to truncate great circle results
+//			params.add(box.getMinLat());
+//			params.add(box.getMaxLat());
+//			params.add(box.getMinLong());
+//			params.add(box.getMaxLong());
 			other = true;
 		}
 		if (years != null){
@@ -231,9 +283,23 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 				new StationMapper(),params.toArray());
 	}
 	
-	private static class ObservationElementMapper implements RowMapper<Observation> {
+	private static class SingleMonthObservation {
+		public final int month, year;
+		public final float[] values;
+		public final Station.Delegate delegate;
+		public final Element.Delegate element;
+		public SingleMonthObservation(Station.Delegate delegate, Element.Delegate element, int year, int month, float[] values){
+			this.delegate = delegate;
+			this.element  = element;
+			this.month = month;
+			this.year  = year;
+			this.values = values;
+		}
+	}
+	
+	private static class SingleMonthObservationElementMapper implements RowMapper<SingleMonthObservation> {
 		@Override
-		public Observation mapRow(ResultSet rs, int arg1) throws SQLException {
+		public SingleMonthObservation mapRow(ResultSet rs, int arg1) throws SQLException {
 			float[] values = new float[OBSERVATION_NUM_COLS];
 			for(int i =1 ; i <= OBSERVATION_NUM_COLS; ++i){
 				String raw = rs.getString(OBSERVATION_VALUE_PREFIX+i);
@@ -247,7 +313,8 @@ public class PostgresDataSourceDAO implements DataSourceDAO{
 			int year = rs.getInt(OBSERVATION_YEAR);
 			String element = rs.getString(OBSERVATION_ELEMENT);
 			String sid = rs.getString(STATION_ID);
-			return new Observation(
+			
+			return new SingleMonthObservation(
 					new Station.Delegate(sid),
 					new Element.Delegate(element),
 					year, month,
